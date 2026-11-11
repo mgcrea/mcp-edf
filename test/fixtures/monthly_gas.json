@@ -1,0 +1,77 @@
+{
+  "monthlyGasEnergies": [
+    {
+      "month": "2025-11",
+      "beginDay": "2025-11-01",
+      "endDay": "2025-12-01",
+      "consumption": {
+        "energy": 1848.41776,
+        "energyM3": 164.0,
+        "conversionFactor": 11.271,
+        "cost": 185.950826656
+      },
+      "standingCharge": 29.28337860215054,
+      "totalCost": 215.23420525815055,
+      "source": "SMART",
+      "nature": "REEL"
+    },
+    {
+      "month": "2025-12",
+      "beginDay": "2025-12-01",
+      "endDay": "2026-01-01",
+      "consumption": {
+        "energy": 1713.16768,
+        "energyM3": 152.0,
+        "conversionFactor": 11.271,
+        "cost": 172.344668608
+      },
+      "standingCharge": 29.346421397849443,
+      "totalCost": 201.69109000584945,
+      "source": "SMART",
+      "nature": "REEL"
+    },
+    {
+      "month": "2026-01",
+      "beginDay": "2026-01-01",
+      "endDay": "2026-02-01",
+      "consumption": {
+        "energy": 2761.3558,
+        "energyM3": 245.0,
+        "conversionFactor": 11.271,
+        "cost": 277.79239348
+      },
+      "standingCharge": 29.31489999999998,
+      "totalCost": 307.10729347999995,
+      "source": "SMART",
+      "nature": "REEL"
+    }
+  ],
+  "yearlyGasEnergies": [
+    {
+      "year": "2025",
+      "beginDay": "2025-11-01",
+      "endDay": "2026-01-01",
+      "consumption": {
+        "energy": 3561.58544,
+        "energyM3": 316.0,
+        "conversionFactor": 11.271,
+        "cost": 358.295495264
+      },
+      "standingCharge": 58.62979999999998,
+      "totalCost": 416.925295264
+    },
+    {
+      "year": "2026",
+      "beginDay": "2026-01-01",
+      "endDay": "2026-11-01",
+      "consumption": {
+        "energy": 9140.651240000001,
+        "energyM3": 811.0,
+        "conversionFactor": 11.271,
+        "cost": 939.724357298547
+      },
+      "standingCharge": 298.8827838709676,
+      "totalCost": 1238.6071411695148
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+[
+  {
+    "day": "2026-10-01",
+    "standingCharge": 1.0253333333333334,
+    "totalCost": 3.171301269333333,
+    "consumption": {
+      "energy": 19.72397,
+      "cost": 2.145967936,
+      "energyM3": 1.75,
+      "conversionFactor": 11.27084
+    }
+  },
+  {
+    "day": "2026-10-02",
+    "standingCharge": 0.9922580645161291,
+    "totalCost": 2.610931021956129,
+    "consumption": {
+      "energy": 14.8775088,
+      "cost": 1.6186729574399998,
+      "energyM3": 1.32,
+      "conversionFactor": 11.27084
+    }
+  },
+  {
+    "day": "2026-10-03",
+    "standingCharge": 0.9922580645161291,
+    "totalCost": 3.125963326596129,
+    "consumption": {
+      "energy": 19.6112616,
+      "cost": 2.13370526208,
+      "energyM3": 1.74,
+      "conversionFactor": 11.27084
+    }
+  }
+]

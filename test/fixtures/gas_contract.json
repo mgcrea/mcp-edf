@@ -1,0 +1,13 @@
+{
+  "tariff": "GAZ_PF2_KWH_98",
+  "option": "CONSO 3",
+  "millesime": "98",
+  "zone": "Z1",
+  "contractName": "Gaz",
+  "parameters": {
+    "MILLESIME": "98",
+    "OPTION": "CONSO 3",
+    "TARIFF": "GAZ_PF2_KWH_98",
+    "ZONE": "Z1"
+  }
+}

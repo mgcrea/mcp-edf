@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "edf": {
+      "command": "node",
+      "args": ["/absolute/path/to/mcp-edf/dist/cli.js"],
+      "env": {
+        "EDF_SITE": ""
+      }
+    }
+  }
+}

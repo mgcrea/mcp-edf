@@ -1,0 +1,67 @@
+{
+  "period": {
+    "startTime": "2025-11-01T00:00:00+01:00",
+    "endTime": "2026-11-01T00:00:00+01:00"
+  },
+  "step": "P1M",
+  "units": {
+    "cost": "EUR",
+    "energyMeter": "KWH"
+  },
+  "consumptions": [
+    {
+      "period": {
+        "startTime": "2025-11-01T00:00:00+01:00",
+        "endTime": "2025-12-01T00:00:00+01:00"
+      },
+      "energyMeter": {
+        "total": 972.127,
+        "byTariffHeading": {
+          "BASE": 972.127
+        }
+      },
+      "cost": {
+        "total": 237.3838574,
+        "standingCharge": 27.21,
+        "standingChargeByComponents": {},
+        "byTariffHeading": {
+          "BASE": 210.1738574
+        }
+      },
+      "quality": 1.0,
+      "errorFlags": [],
+      "indexNatures": ["LINKY_OK"],
+      "status": "COMPLETE",
+      "nature": "REAL",
+      "aggregated": false,
+      "usingLoadCurve": false
+    },
+    {
+      "period": {
+        "startTime": "2025-12-01T00:00:00+01:00",
+        "endTime": "2026-01-01T00:00:00+01:00"
+      },
+      "energyMeter": {
+        "total": 1023.447,
+        "byTariffHeading": {
+          "BASE": 1023.447
+        }
+      },
+      "cost": {
+        "total": 248.4792414,
+        "standingCharge": 27.21000000000001,
+        "standingChargeByComponents": {},
+        "byTariffHeading": {
+          "BASE": 221.2692414
+        }
+      },
+      "quality": 1.0,
+      "errorFlags": [],
+      "indexNatures": ["LINKY_OK"],
+      "status": "COMPLETE",
+      "nature": "REAL",
+      "aggregated": false,
+      "usingLoadCurve": false
+    }
+  ]
+}

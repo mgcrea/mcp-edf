@@ -1,0 +1,121 @@
+{
+  "period": {
+    "startTime": "2026-11-05T00:00:00+01:00",
+    "endTime": "2026-11-06T00:00:00+01:00"
+  },
+  "step": "PT30M",
+  "units": {
+    "cost": "EUR",
+    "energyMeter": "KWH"
+  },
+  "consumptions": [
+    {
+      "period": {
+        "startTime": "2026-11-05T00:00:00+01:00",
+        "endTime": "2026-11-05T00:30:00+01:00"
+      },
+      "energyMeter": {
+        "total": 0.615,
+        "byTariffHeading": {
+          "BASE": 0.615
+        }
+      },
+      "cost": {
+        "total": 0.1446645,
+        "standingCharge": 0.02025,
+        "standingChargeByComponents": {},
+        "byTariffHeading": {
+          "BASE": 0.1244145
+        }
+      },
+      "quality": 1.0,
+      "errorFlags": [],
+      "indexNatures": [],
+      "status": "COMPLETE",
+      "nature": "REAL",
+      "aggregated": false,
+      "usingLoadCurve": true
+    },
+    {
+      "period": {
+        "startTime": "2026-11-05T00:30:00+01:00",
+        "endTime": "2026-11-05T01:00:00+01:00"
+      },
+      "energyMeter": {
+        "total": 0.617,
+        "byTariffHeading": {
+          "BASE": 0.617
+        }
+      },
+      "cost": {
+        "total": 0.1450691,
+        "standingCharge": 0.02025,
+        "standingChargeByComponents": {},
+        "byTariffHeading": {
+          "BASE": 0.1248191
+        }
+      },
+      "quality": 1.0,
+      "errorFlags": [],
+      "indexNatures": [],
+      "status": "COMPLETE",
+      "nature": "REAL",
+      "aggregated": false,
+      "usingLoadCurve": true
+    },
+    {
+      "period": {
+        "startTime": "2026-11-05T01:00:00+01:00",
+        "endTime": "2026-11-05T01:30:00+01:00"
+      },
+      "energyMeter": {
+        "total": 0.458,
+        "byTariffHeading": {
+          "BASE": 0.458
+        }
+      },
+      "cost": {
+        "total": 0.1129034,
+        "standingCharge": 0.02025,
+        "standingChargeByComponents": {},
+        "byTariffHeading": {
+          "BASE": 0.09265340000000001
+        }
+      },
+      "quality": 1.0,
+      "errorFlags": [],
+      "indexNatures": [],
+      "status": "COMPLETE",
+      "nature": "REAL",
+      "aggregated": false,
+      "usingLoadCurve": true
+    },
+    {
+      "period": {
+        "startTime": "2026-11-05T01:30:00+01:00",
+        "endTime": "2026-11-05T02:00:00+01:00"
+      },
+      "energyMeter": {
+        "total": 0.417,
+        "byTariffHeading": {
+          "BASE": 0.417
+        }
+      },
+      "cost": {
+        "total": 0.1046091,
+        "standingCharge": 0.02025,
+        "standingChargeByComponents": {},
+        "byTariffHeading": {
+          "BASE": 0.0843591
+        }
+      },
+      "quality": 1.0,
+      "errorFlags": [],
+      "indexNatures": [],
+      "status": "COMPLETE",
+      "nature": "REAL",
+      "aggregated": false,
+      "usingLoadCurve": true
+    }
+  ]
+}

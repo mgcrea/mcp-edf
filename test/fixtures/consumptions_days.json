@@ -1,0 +1,121 @@
+{
+  "period": {
+    "startTime": "2026-10-01T00:00:00+02:00",
+    "endTime": "2026-10-08T00:00:00+02:00"
+  },
+  "step": "P1D",
+  "units": {
+    "cost": "EUR",
+    "energyMeter": "KWH"
+  },
+  "consumptions": [
+    {
+      "period": {
+        "startTime": "2026-10-01T00:00:00+02:00",
+        "endTime": "2026-10-02T00:00:00+02:00"
+      },
+      "energyMeter": {
+        "total": 19.217,
+        "byTariffHeading": {
+          "BASE": 19.217
+        }
+      },
+      "cost": {
+        "total": 4.828244261290323,
+        "standingCharge": 0.9406451612903226,
+        "standingChargeByComponents": {},
+        "byTariffHeading": {
+          "BASE": 3.8875991
+        }
+      },
+      "quality": 1.0,
+      "errorFlags": [],
+      "indexNatures": ["LINKY_OK"],
+      "status": "COMPLETE",
+      "nature": "REAL",
+      "aggregated": false,
+      "usingLoadCurve": false
+    },
+    {
+      "period": {
+        "startTime": "2026-10-02T00:00:00+02:00",
+        "endTime": "2026-10-03T00:00:00+02:00"
+      },
+      "energyMeter": {
+        "total": 24.543,
+        "byTariffHeading": {
+          "BASE": 24.543
+        }
+      },
+      "cost": {
+        "total": 5.905694061290323,
+        "standingCharge": 0.9406451612903226,
+        "standingChargeByComponents": {},
+        "byTariffHeading": {
+          "BASE": 4.9650489
+        }
+      },
+      "quality": 1.0,
+      "errorFlags": [],
+      "indexNatures": ["LINKY_OK"],
+      "status": "COMPLETE",
+      "nature": "REAL",
+      "aggregated": false,
+      "usingLoadCurve": false
+    },
+    {
+      "period": {
+        "startTime": "2026-10-03T00:00:00+02:00",
+        "endTime": "2026-10-04T00:00:00+02:00"
+      },
+      "energyMeter": {
+        "total": 17.644,
+        "byTariffHeading": {
+          "BASE": 17.644
+        }
+      },
+      "cost": {
+        "total": 4.510026361290323,
+        "standingCharge": 0.9406451612903226,
+        "standingChargeByComponents": {},
+        "byTariffHeading": {
+          "BASE": 3.5693811999999996
+        }
+      },
+      "quality": 1.0,
+      "errorFlags": [],
+      "indexNatures": ["LINKY_OK"],
+      "status": "COMPLETE",
+      "nature": "REAL",
+      "aggregated": false,
+      "usingLoadCurve": false
+    }
+  ],
+  "globalConsumption": {
+    "period": {
+      "startTime": "2026-10-01T00:00:00+02:00",
+      "endTime": "2026-10-08T00:00:00+02:00"
+    },
+    "energyMeter": {
+      "total": 61.403999999999996,
+      "byTariffHeading": {
+        "BASE": 159.811
+      }
+    },
+    "cost": {
+      "total": 15.243964683870967,
+      "standingCharge": 2.821935483870968,
+      "standingChargeByComponents": {},
+      "byTariffHeading": {
+        "BASE": 32.329765300000005
+      }
+    },
+    "quality": 1.0,
+    "errorFlags": [],
+    "indexNatures": ["LINKY_OK"],
+    "status": "COMPLETE",
+    "nature": "REAL",
+    "aggregated": false,
+    "usingLoadCurve": false
+  }
+}
