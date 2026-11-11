@@ -4,10 +4,13 @@ import type { AuthController } from "#/auth/controller";
 import { siteLabel, type EdfClient } from "#/client/edf";
 import type { Config } from "#/config";
 import { registerAuthTools } from "#/tools/auth";
+import { registerComparisonTools } from "#/tools/comparisons";
 import { registerContractTools } from "#/tools/contracts";
 import { registerElectricityTools } from "#/tools/electricity";
 import { registerGasTools } from "#/tools/gas";
 import { registerRequestTool } from "#/tools/request";
+import { registerUsageTools } from "#/tools/usage";
+import { registerWeatherTools } from "#/tools/weather";
 
 export type ToolContext = {
   config: Config;
@@ -31,6 +34,9 @@ export const registerTools = (server: McpServer, client: EdfClient, ctx: ToolCon
   registerContractTools(server, client, ctx);
   registerElectricityTools(server, client, ctx);
   registerGasTools(server, client, ctx);
+  registerWeatherTools(server, client, ctx);
+  registerComparisonTools(server, client, ctx);
+  registerUsageTools(server, client, ctx);
   registerRequestTool(server, client);
 };
 

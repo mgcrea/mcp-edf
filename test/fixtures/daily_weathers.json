@@ -1,0 +1,20 @@
+[
+  {
+    "day": "2026-11-01",
+    "valueWithDecimal": 9.0,
+    "value": 9,
+    "picto": "P1"
+  },
+  {
+    "day": "2026-11-02",
+    "valueWithDecimal": 8.6,
+    "value": 9,
+    "picto": "P6"
+  },
+  {
+    "day": "2026-11-03",
+    "valueWithDecimal": 7.5,
+    "value": 8,
+    "picto": "P6"
+  }
+]

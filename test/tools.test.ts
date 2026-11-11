@@ -6,11 +6,15 @@ const ALL_TOOLS = [
   "edf_auth_login",
   "edf_auth_logout",
   "edf_auth_status",
+  "edf_compare_periods",
+  "edf_compare_years",
   "edf_get_contracts",
   "edf_get_electricity_consumption",
   "edf_get_electricity_load_curve",
   "edf_get_electricity_max_power",
   "edf_get_gas_consumption",
+  "edf_get_usage_breakdown",
+  "edf_get_weather",
   "edf_request",
 ];
 

@@ -1,0 +1,25 @@
+[
+  {
+    "month": "2025-11",
+    "cost": 115,
+    "energy": 472
+  },
+  {
+    "month": "2025-12",
+    "cost": 141,
+    "energy": 579,
+    "costVariation": 26,
+    "costVariationRelatedToDays": 0,
+    "costVariationRelatedToMeteorology": -2039,
+    "costVariationRelatedToComfort": 2065
+  },
+  {
+    "month": "2026-01",
+    "cost": 154,
+    "energy": 640,
+    "costVariation": 13,
+    "costVariationRelatedToDays": 0,
+    "costVariationRelatedToMeteorology": -2386,
+    "costVariationRelatedToComfort": 2399
+  }
+]

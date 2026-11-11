@@ -1,0 +1,45 @@
+{
+  "units": {
+    "cost": "EUR",
+    "energyMeter": "KWH"
+  },
+  "comparisons": [
+    {
+      "selectedPeriod": {
+        "period": {
+          "startTime": "2026-10-01T00:00:00+02:00",
+          "endTime": "2026-11-01T00:00:00+01:00"
+        },
+        "cost": {
+          "total": 182.62619610000002
+        },
+        "energyMeter": {
+          "total": 758.607
+        },
+        "errorFlags": []
+      },
+      "referencePeriod": {
+        "period": {
+          "startTime": "2025-10-01T00:00:00+02:00",
+          "endTime": "2025-11-01T00:00:00+01:00"
+        },
+        "cost": {
+          "total": 204.26958439999999
+        },
+        "energyMeter": {
+          "total": 818.962
+        },
+        "errorFlags": []
+      },
+      "weatherImpactMessageCode": "NEUTRAL_WEATHER_LOWER_CONSO",
+      "differenceRate": {
+        "cost": {
+          "total": -10.595502195577959
+        },
+        "energyMeter": {
+          "total": -7.3696948087945495
+        }
+      }
+    }
+  ]
+}

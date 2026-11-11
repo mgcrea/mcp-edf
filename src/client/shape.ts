@@ -295,3 +295,244 @@ export const summarizeGasContract = (res: unknown) => {
     ...(zone ? { zone } : {}),
   };
 };
+
+// -------------------------------------------------------------------- weather
+
+/**
+ * Suivi Conso's weather pictograms (`picto`), from the site's French
+ * translations (`weather_picto_P4_description` = "Belles éclaircies"). The
+ * weather is the home's nearest station, as the site shows it under the
+ * consumption chart: one average temperature and one sky per day.
+ */
+export const SKY_BY_PICTO: Record<string, string> = {
+  P1: "sunny",
+  P2: "hazy sun",
+  P3: "cloudy",
+  P4: "sunny spells",
+  P5: "brief sunny spells",
+  P6: "overcast",
+  P7: "occasional showers",
+  P8: "light rain",
+  P9: "heavy rain",
+  P10: "light snow",
+  P11: "snow",
+  P12: "heavy snow",
+  P13: "isolated thunderstorms",
+  P14: "thunderstorms",
+  P15: "fog",
+  P16: "freezing fog",
+  P17: "black ice",
+};
+
+const roundTenth = (value: number): number => Math.round(value * 10) / 10;
+
+const tempSummary = (temps: { date: string; t: number }[]) => {
+  if (temps.length === 0) return {};
+  const coldest = temps.reduce((a, b) => (b.t < a.t ? b : a));
+  const warmest = temps.reduce((a, b) => (b.t > a.t ? b : a));
+  return {
+    avg_temp_c: roundTenth(temps.reduce((s, x) => s + x.t, 0) / temps.length),
+    coldest: { date: coldest.date, temp_c: coldest.t },
+    warmest: { date: warmest.date, temp_c: warmest.t },
+  };
+};
+
+/** `GET /v1/sites/-/daily-weathers`: `[{day, valueWithDecimal, value, picto}]`. */
+export const summarizeDailyWeather = (res: unknown) => {
+  const days = Array.isArray(res)
+    ? (res as { day?: string; valueWithDecimal?: number; value?: number; picto?: string }[])
+    : [];
+  const rows: [string, number | null, string | null][] = days.map((d) => {
+    const t = typeof d.valueWithDecimal === "number" ? d.valueWithDecimal : d.value;
+    return [
+      d.day ?? "",
+      typeof t === "number" ? roundTenth(t) : null,
+      d.picto ? (SKY_BY_PICTO[d.picto] ?? d.picto) : null,
+    ];
+  });
+  return {
+    step: "day",
+    columns: ["date", "avg_temp_c", "sky"],
+    ...tempSummary(rows.flatMap(([date, t]) => (t === null ? [] : [{ date, t }]))),
+    rows,
+  };
+};
+
+/** `GET /v1/sites/-/monthly-temperatures`: `[{month, value}]`, whole degrees. */
+export const summarizeMonthlyWeather = (res: unknown) => {
+  const months = Array.isArray(res) ? (res as { month?: string; value?: number }[]) : [];
+  const rows: [string, number | null][] = months.map((m) => [
+    m.month ?? "",
+    typeof m.value === "number" ? m.value : null,
+  ]);
+  return {
+    step: "month",
+    columns: ["month", "avg_temp_c"],
+    ...tempSummary(rows.flatMap(([date, t]) => (t === null ? [] : [{ date, t }]))),
+    rows,
+  };
+};
+
+// ---------------------------------------------------------------- comparisons
+
+type YearPoint = { energy?: number; totalCost?: number };
+type MonthComparison = {
+  month?: number;
+  currentYearMonthConsumption?: YearPoint;
+  previousYearMonthConsumption?: YearPoint;
+  isFullMonth?: boolean;
+  energyDifferenceRate?: number;
+  totalCostDifferenceRate?: number;
+};
+
+const pct = (now: number, before: number): number | null =>
+  before > 0 ? Math.round(((now - before) / before) * 1000) / 10 : null;
+
+/**
+ * `GET /v1/sites/-/monthly-comparisons?year&fluid`: each month of `year` against
+ * the same month a year earlier. EDF rounds these to whole kWh and euros. The
+ * totals cover only months present in both years, so a half-finished month or a
+ * month with no data last year cannot skew the comparison.
+ */
+export const summarizeYearComparison = (res: unknown, year: number) => {
+  const months = Array.isArray(res) ? (res as MonthComparison[]) : [];
+  let now = 0;
+  let before = 0;
+  let nowCost = 0;
+  let beforeCost = 0;
+  const rows = months.map((m) => {
+    const cur = m.currentYearMonthConsumption ?? {};
+    const prev = m.previousYearMonthConsumption ?? {};
+    const hasBoth = typeof cur.energy === "number" && typeof prev.energy === "number";
+    if (hasBoth && m.isFullMonth !== false) {
+      now += num(cur.energy);
+      before += num(prev.energy);
+      nowCost += num(cur.totalCost);
+      beforeCost += num(prev.totalCost);
+    }
+    return {
+      month: `${year}-${String(m.month ?? 0).padStart(2, "0")}`,
+      kwh: typeof cur.energy === "number" ? cur.energy : null,
+      kwh_previous_year: typeof prev.energy === "number" ? prev.energy : null,
+      kwh_change_pct: m.energyDifferenceRate ?? null,
+      cost_eur: typeof cur.totalCost === "number" ? cur.totalCost : null,
+      cost_previous_year_eur: typeof prev.totalCost === "number" ? prev.totalCost : null,
+      cost_change_pct: m.totalCostDifferenceRate ?? null,
+      ...(m.isFullMonth === false ? { partial_month: true } : {}),
+    };
+  });
+  return {
+    year,
+    previous_year: year - 1,
+    total_complete_months: {
+      kwh: now,
+      kwh_previous_year: before,
+      kwh_change_pct: pct(now, before),
+      cost_eur: nowCost,
+      cost_previous_year_eur: beforeCost,
+      cost_change_pct: pct(nowCost, beforeCost),
+    },
+    rows,
+  };
+};
+
+/**
+ * EDF's verdict on a period comparison, e.g. `COLDER_WEATHER_HIGHER_CONSO`:
+ * whether the period was warmer or colder than the reference, and whether
+ * consumption went up or down. It is a qualitative reading, not a correction:
+ * the kWh themselves are not weather-adjusted.
+ */
+export const parseWeatherVerdict = (code: unknown) => {
+  if (typeof code !== "string") return undefined;
+  const m = /^(WARMER|NEUTRAL|COLDER)_WEATHER_(HIGHER|NEUTRAL|LOWER)_CONSO$/.exec(code);
+  if (!m) return { code };
+  const weather = { WARMER: "warmer", NEUTRAL: "similar", COLDER: "colder" }[m[1] as string];
+  const consumption = { HIGHER: "higher", NEUTRAL: "similar", LOWER: "lower" }[m[2] as string];
+  return { weather, consumption, code };
+};
+
+type PeriodSide = {
+  period?: { startTime?: string; endTime?: string };
+  cost?: { total?: number };
+  energyMeter?: { total?: number };
+  errorFlags?: unknown[];
+};
+
+const rate = (v: number | undefined): number | null =>
+  typeof v === "number" ? Math.round(v * 10) / 10 : null;
+
+/** `GET /v1/sites/-/consumptions-self-comparison`: one comparison of two periods. */
+export const summarizePeriodComparison = (res: unknown) => {
+  const c = (isRecord(res) && Array.isArray(res.comparisons) ? res.comparisons[0] : undefined) as
+    | {
+        selectedPeriod?: PeriodSide;
+        referencePeriod?: PeriodSide;
+        weatherImpactMessageCode?: string;
+        differenceRate?: { cost?: { total?: number }; energyMeter?: { total?: number } };
+      }
+    | undefined;
+  if (!c) return { comparison: null };
+  const side = (s: PeriodSide | undefined) => ({
+    from: (s?.period?.startTime ?? "").slice(0, 10),
+    to_exclusive: (s?.period?.endTime ?? "").slice(0, 10),
+    kwh: kwh(num(s?.energyMeter?.total)),
+    cost_eur: eur(num(s?.cost?.total)),
+    ...(s?.errorFlags && s.errorFlags.length > 0 ? { error_flags: s.errorFlags } : {}),
+  });
+  return {
+    period: side(c.selectedPeriod),
+    reference: side(c.referencePeriod),
+    kwh_change_pct: rate(c.differenceRate?.energyMeter?.total),
+    cost_change_pct: rate(c.differenceRate?.cost?.total),
+    ...(c.weatherImpactMessageCode
+      ? { weather_verdict: parseWeatherVerdict(c.weatherImpactMessageCode) }
+      : {}),
+  };
+};
+
+// -------------------------------------------------------------------- usages
+
+type UsageEntry = {
+  usage?: string;
+  cost?: number;
+  percent?: number;
+  energy?: number;
+  fiability?: { isReliable?: boolean };
+};
+
+/**
+ * `GET /v1/sites/-/usage-breakdowns?ts&fluid`: EDF's MODEL of where the energy
+ * went over the 12 months to `ts` (`algorithm` names it, e.g.
+ * MIX_DISAGGREGATION_SIMFAST). It leans on the home profile declared in Suivi
+ * Conso, so it is only as current as that profile.
+ */
+export const summarizeUsageBreakdown = (res: unknown) => {
+  const env = isRecord(res) ? res : {};
+  const entries = Array.isArray(env.usageBreakdowns) ? (env.usageBreakdowns as UsageEntry[]) : [];
+  return {
+    from_month: typeof env.beginMonth === "string" ? env.beginMonth : null,
+    to_month_exclusive: typeof env.endMonth === "string" ? env.endMonth : null,
+    model: typeof env.algorithm === "string" ? env.algorithm : null,
+    total: { kwh: num(env.totalEnergy), cost_eur: num(env.totalCost) },
+    usages: entries
+      .map((u) => ({
+        usage: (u.usage ?? "").replace(/^US_/, "").toLowerCase(),
+        kwh: num(u.energy),
+        cost_eur: num(u.cost),
+        percent: num(u.percent),
+        ...(u.fiability?.isReliable === false ? { reliable: false } : {}),
+      }))
+      .toSorted((a, b) => b.kwh - a.kwh),
+  };
+};
+
+/** `GET /v1/sites/-/monthly-elec-heating-consumptions`: EDF's monthly estimate of electric heating. */
+export const summarizeMonthlyElecHeating = (res: unknown) => {
+  const months = Array.isArray(res)
+    ? (res as { month?: string; energy?: number; cost?: number }[])
+    : [];
+  // costVariationRelatedToMeteorology / …ToComfort are left out on purpose:
+  // they come as large opposite numbers (-2039 / +2065 for a 26 € change on
+  // 2026-11-11) whose unit and meaning are not documented anywhere.
+  return months.map((m): [string, number, number] => [m.month ?? "", num(m.energy), num(m.cost)]);
+};

@@ -1,0 +1,60 @@
+{
+  "beginMonth": "2025-11",
+  "endMonth": "2026-11",
+  "units": {
+    "cost": "EUR",
+    "energyMeter": "KWH"
+  },
+  "totalCost": 2586,
+  "totalEnergy": 10627.0,
+  "algorithm": "MIX_DISAGGREGATION_SIMFAST",
+  "usageBreakdowns": [
+    {
+      "usage": "US_HEATING",
+      "cost": 395,
+      "percent": 15,
+      "energy": 1615
+    },
+    {
+      "usage": "US_WASHING_DRYING",
+      "cost": 217,
+      "percent": 8,
+      "energy": 901,
+      "fiability": {
+        "isReliable": true,
+        "equipmentsFiability": {
+          "washerNumber": "1",
+          "dishwasherNumber": "1",
+          "dryerNumber": "1"
+        }
+      }
+    },
+    {
+      "usage": "US_FRIDGE_FREEZER",
+      "cost": 445,
+      "percent": 17,
+      "energy": 1821,
+      "fiability": {
+        "isReliable": true,
+        "equipmentsFiability": {
+          "fridgeFreezerNumber": "2"
+        }
+      }
+    },
+    {
+      "usage": "US_COOKING",
+      "cost": 325,
+      "percent": 13,
+      "energy": 1339,
+      "fiability": {
+        "isReliable": true,
+        "equipmentsFiability": {
+          "microWaveNumber": "1",
+          "inductionPlateNumber": "1",
+          "electricOvenNumber": "1"
+        }
+      }
+    }
+  ],
+  "generalProfilComplete": true
+}

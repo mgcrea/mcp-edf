@@ -1,0 +1,50 @@
+[
+  {
+    "month": 1,
+    "currentYearMonthConsumption": {
+      "energy": 1148,
+      "totalCost": 277
+    },
+    "previousYearMonthConsumption": {
+      "energy": 1079,
+      "totalCost": 243
+    },
+    "beginMonthDay": "--01-01",
+    "endMonthDay": "--02-01",
+    "isFullMonth": true,
+    "energyDifferenceRate": 6,
+    "totalCostDifferenceRate": 14
+  },
+  {
+    "month": 2,
+    "currentYearMonthConsumption": {
+      "energy": 815,
+      "totalCost": 204
+    },
+    "previousYearMonthConsumption": {
+      "energy": 1013,
+      "totalCost": 248
+    },
+    "beginMonthDay": "--02-01",
+    "endMonthDay": "--03-01",
+    "isFullMonth": true,
+    "energyDifferenceRate": -20,
+    "totalCostDifferenceRate": -18
+  },
+  {
+    "month": 11,
+    "currentYearMonthConsumption": {
+      "energy": 300,
+      "totalCost": 70
+    },
+    "previousYearMonthConsumption": {
+      "energy": 900,
+      "totalCost": 200
+    },
+    "beginMonthDay": "--11-01",
+    "endMonthDay": "--11-11",
+    "isFullMonth": false,
+    "energyDifferenceRate": -67,
+    "totalCostDifferenceRate": -65
+  }
+]

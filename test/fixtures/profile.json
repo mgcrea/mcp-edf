@@ -1,0 +1,7 @@
+{
+  "version": "EDELIA",
+  "housing": {
+    "constructionDate": 1950,
+    "equipment": { "airConditioning": { "isACPresent": false } }
+  }
+}

@@ -91,7 +91,7 @@ jobs:
           #    the same read-only tools signed in or out (the login happens at
           #    runtime), so the check is equality: a renamed or vanished tool
           #    fails here instead of at a client.
-          expected="edf_auth_login edf_auth_logout edf_auth_status edf_get_contracts edf_get_electricity_consumption edf_get_electricity_load_curve edf_get_electricity_max_power edf_get_gas_consumption edf_request"
+          expected="edf_auth_login edf_auth_logout edf_auth_status edf_compare_periods edf_compare_years edf_get_contracts edf_get_electricity_consumption edf_get_electricity_load_curve edf_get_electricity_max_power edf_get_gas_consumption edf_get_usage_breakdown edf_get_weather edf_request"
           # [a-z0-9_], not [a-z_]: a narrower class can match nothing and pass vacuously.
           actual=$(grep -o '"name":"edf_[a-z0-9_]*"' /tmp/unconfigured.json | cut -d'"' -f4 | sort -u | tr '\n' ' ' | sed 's/ $//')
           [ "$actual" = "$expected" ] \

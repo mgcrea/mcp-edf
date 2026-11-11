@@ -14,17 +14,26 @@ It reads; it never writes. There are no mutating tools to enable.
 
 ## Tools
 
-| Tool                              | What it does                                                                   |
-| --------------------------------- | ------------------------------------------------------------------------------ |
-| `edf_auth_status`                 | Signed in or not, which home it reads, where the login is stored               |
-| `edf_auth_login`                  | Logs in through a Safari tab (macOS) and keeps a refresh token                 |
-| `edf_auth_logout`                 | Revokes the refresh token at EDF and deletes it locally                        |
-| `edf_get_contracts`               | Electricity option (BASE / HPHC / TEMPO…), subscribed kVA, gas tariff, history |
-| `edf_get_electricity_consumption` | kWh and € per day or month, split by tariff heading, with totals               |
-| `edf_get_electricity_load_curve`  | `[start, kWh, avg kW]` per 30 minutes or hour, with the peak                   |
-| `edf_get_electricity_max_power`   | Daily peak kVA against the subscribed power                                    |
-| `edf_get_gas_consumption`         | kWh, m³ and € per day or month, with the conversion factor                     |
-| `edf_request`                     | GET any other Suivi Conso API path (raw JSON)                                  |
+| Tool                              | What it does                                                                    |
+| --------------------------------- | ------------------------------------------------------------------------------- |
+| `edf_auth_status`                 | Signed in or not, which home it reads, where the login is stored                |
+| `edf_auth_login`                  | Logs in through a Safari tab (macOS) and keeps a refresh token                  |
+| `edf_auth_logout`                 | Revokes the refresh token at EDF and deletes it locally                         |
+| `edf_get_contracts`               | Electricity option (BASE / HPHC / TEMPO…), subscribed kVA, gas tariff, history  |
+| `edf_get_electricity_consumption` | kWh and € per day or month, split by tariff heading, with totals                |
+| `edf_get_electricity_load_curve`  | `[start, kWh, avg kW]` per 30 minutes or hour, with the peak                    |
+| `edf_get_electricity_max_power`   | Daily peak kVA against the subscribed power                                     |
+| `edf_get_gas_consumption`         | kWh, m³ and € per day or month, with the conversion factor                      |
+| `edf_get_weather`                 | Daily (with sky) or monthly temperature at the home's weather station           |
+| `edf_compare_years`               | Each month against the same month last year, electricity or gas                 |
+| `edf_compare_periods`             | Electricity in two periods, with EDF's warmer/colder weather verdict            |
+| `edf_get_usage_breakdown`         | EDF's modelled split by use (heating, hot water…), and monthly electric heating |
+| `edf_request`                     | GET any other Suivi Conso API path (raw JSON)                                   |
+
+None of the comparisons is weather-adjusted: EDF gives a qualitative verdict
+(warmer or colder, higher or lower) and the temperatures, and the analysis is left to whoever reads
+them. The usage breakdown is EDF's model, fed by the home profile declared on Suivi Conso, so it
+lags behind new equipment until that profile is updated.
 
 Costs are EDF's own estimate at the contract's prices, taxes included, as shown on Suivi Conso.
 They follow the bill closely, but they are not the invoice. Invoices are not available through
