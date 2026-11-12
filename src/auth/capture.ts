@@ -13,9 +13,10 @@ import { execFile } from "node:child_process";
  * of 3 races on 2026-11-11; the SPA needs its bundles before it can act.
  *
  * The tab opens in the background. If EDF's SSO session in Safari is still
- * alive, the redirect arrives within a second or two and the user sees nothing
- * but a flicker. If not, Safari is brought forward after two seconds so the
- * user can log in.
+ * alive, the redirect arrives within a second (0.3 to 0.8 s measured) and the
+ * user sees nothing but a flicker. If not, an interactive login brings Safari
+ * forward after two seconds so the user can log in; a silent renewal
+ * (`reveal: false`) never does, and gives up at its deadline instead.
  */
 
 export type CaptureResult =
@@ -31,6 +32,12 @@ export type RedirectCapture = (opts: {
   /** The redirect prefix to wait for, e.g. https://suiviconso.edf.fr/openid */
   redirectPrefix: string;
   timeoutMs: number;
+  /**
+   * Bring Safari forward when the login needs the user. Defaults to true. The
+   * silent renewal passes false: it runs behind a tool call, unasked, so it must
+   * never take the focus.
+   */
+  reveal?: boolean;
   signal?: AbortSignal;
 }) => Promise<CaptureResult>;
 
@@ -63,10 +70,27 @@ export const buildCaptureScript = (opts: {
   authorizeUrl: string;
   redirectPrefix: string;
   timeoutMs: number;
+  reveal?: boolean;
 }): string => {
   const marker = new URL(opts.authorizeUrl).searchParams.get("state") ?? opts.authorizeUrl;
   const seconds = Math.max(1, Math.ceil(opts.timeoutMs / 1000));
   const revealAfter = Math.ceil(REVEAL_AFTER_MS / 1000);
+  // The reveal block is left out entirely rather than skipped at run time, so a
+  // silent renewal cannot activate Safari by any path.
+  const revealBlock =
+    opts.reveal === false
+      ? "    -- Silent: the tab stays in the background and Safari stays where it is."
+      : `    -- No redirect within 2 s: the user has to log in, so show the tab. This must
+    -- not wait for the marker to be seen: Safari leaves a background tab in an
+    -- unfocused window unloaded, with a missing URL, until it is shown.
+    if not revealed and ((current date) - startedAt) >= ${revealAfter} then
+      set revealed to true
+      try
+        set index of window id wid to 1
+        set current tab of window id wid to last tab of window id wid
+      end try
+      activate
+    end if`;
   return `
 tell application "Safari"
   -- A regular window, never a Private Browsing one: Safari hides private tabs'
@@ -122,17 +146,7 @@ tell application "Safari"
         end if
       end repeat
     end repeat
-    -- No redirect within 2 s: the user has to log in, so show the tab. This must
-    -- not wait for the marker to be seen: Safari leaves a background tab in an
-    -- unfocused window unloaded, with a missing URL, until it is shown.
-    if not revealed and ((current date) - startedAt) >= ${revealAfter} then
-      set revealed to true
-      try
-        set index of window id wid to 1
-        set current tab of window id wid to last tab of window id wid
-      end try
-      activate
-    end if
+${revealBlock}
     if not hit and seenAt is not missing value and ((current date) - seenAt) > 5 then return "${TAB_CLOSED}"
   end repeat
   -- Out of time: close our tab if it is still open, so nothing is left behind.
@@ -154,6 +168,7 @@ export const safariCapture: RedirectCapture = ({
   authorizeUrl,
   redirectPrefix,
   timeoutMs,
+  reveal,
   signal,
 }) =>
   new Promise((resolve) => {
@@ -167,7 +182,12 @@ export const safariCapture: RedirectCapture = ({
       });
       return;
     }
-    const script = buildCaptureScript({ authorizeUrl, redirectPrefix, timeoutMs });
+    const script = buildCaptureScript({
+      authorizeUrl,
+      redirectPrefix,
+      timeoutMs,
+      ...(reveal === undefined ? {} : { reveal }),
+    });
     const child = execFile(
       "osascript",
       ["-e", script],

@@ -37,7 +37,7 @@ const denied: RedirectCapture = async () => ({
 });
 
 describe("edf_auth_login (automatic)", () => {
-  it("asks EDF for the Suivi Conso client, catches the code, and stores the refresh token", async () => {
+  it("asks EDF for the Suivi Conso client, catches the code, and stores the access token", async () => {
     let authorizeUrl = "";
     const store = createMemoryTokenStore(undefined);
     const harness = await connect({
@@ -75,10 +75,11 @@ describe("edf_auth_login (automatic)", () => {
     );
     expect(url.searchParams.get("client_id")).toBe("equilibre-portal-v2");
     expect(url.searchParams.get("scope")).toBe("b2c_business_process b2c_services");
-    expect(store.read()).toMatchObject({
-      refreshToken: "R1",
+    expect(store.read()).toEqual({
+      version: 2,
       accessToken: "A1",
       expiresAt: NOW + 1_199_000,
+      obtainedAt: NOW,
     });
 
     const status = await harness.call("edf_auth_status");
@@ -127,7 +128,7 @@ describe("edf_auth_login (manual redirect_url)", () => {
       redirect_url: "https://suiviconso.edf.fr/openid?code=PASTED&state=whatever",
     });
     expect(res.signedIn).toBe(true);
-    expect(store.read()?.refreshToken).toBe("R1");
+    expect(store.read()?.accessToken).toBe("A1");
   });
 
   it("explains a URL the SPA already stripped", () => {
@@ -138,23 +139,31 @@ describe("edf_auth_login (manual redirect_url)", () => {
   });
 });
 
-describe("the token provider", () => {
-  it("refreshes an expired access token and keeps the refresh token EDF does not rotate", async () => {
-    const store = createMemoryTokenStore(
-      signedInTokens({ accessToken: "OLD", expiresAt: NOW - 1 }),
-    );
+const expired = () =>
+  createMemoryTokenStore(signedInTokens({ accessToken: "OLD", expiresAt: NOW - 1 }));
+const exchange = (accessToken: string) =>
+  tokenEndpoint((form) => {
+    expect(form.get("grant_type")).toBe("authorization_code");
+    // EDF's refresh token is dead within a second: never worth sending.
+    expect(form.has("refresh_token")).toBe(false);
+    return jsonResponse({ access_token: accessToken, refresh_token: "R", expires_in: 1199 });
+  });
+
+describe("silent renewal", () => {
+  it("renews a lapsed login through a silent Safari capture, once per burst", async () => {
+    const captures: (boolean | undefined)[] = [];
+    const store = expired();
     const harness = await connect({
       realAuth: true,
       store,
+      capture: async (opts) => {
+        captures.push(opts.reveal);
+        return landingWith("CODE-2")(opts);
+      },
       fetch: router({
         ...baseRoutes(),
         "/v2/sites/-/elec-pmax": fixture("elec_pmax"),
-        [TOKEN_URL]: tokenEndpoint((form) => {
-          expect(form.get("grant_type")).toBe("refresh_token");
-          expect(form.get("refresh_token")).toBe("refresh-1");
-          // EDF answers a refresh without a new refresh_token.
-          return jsonResponse({ access_token: "NEW", expires_in: 1199 });
-        }),
+        [TOKEN_URL]: exchange("NEW"),
       }),
     });
     const res = await harness.call("edf_get_electricity_max_power", {
@@ -162,41 +171,57 @@ describe("the token provider", () => {
       to: "2026-11-10",
     });
     expect(res.isToolError).toBe(false);
-    expect(store.read()).toMatchObject({ refreshToken: "refresh-1", accessToken: "NEW" });
+    // Never brings Safari forward: it runs behind a tool call, unasked.
+    expect(captures).toEqual([false]);
+    expect(store.read()).toMatchObject({ accessToken: "NEW", obtainedAt: NOW });
     const api = harness.urls().findIndex((u) => u.pathname.endsWith("/elec-pmax"));
     expect(harness.headersAt(api).Authorization).toBe("Bearer NEW");
-    // One refresh for the burst (sites + pmax + contract), not one per call.
     expect(harness.urls().filter((u) => u.toString() === TOKEN_URL)).toHaveLength(1);
   });
 
-  it("turns invalid_grant into signedIn: false with the login remedy", async () => {
-    const store = createMemoryTokenStore(signedInTokens({ accessToken: undefined, expiresAt: 0 }));
+  it("gives up after one failed attempt, until the next login", async () => {
+    let captures = 0;
     const harness = await connect({
       realAuth: true,
-      store,
-      fetch: router({
-        [TOKEN_URL]: () =>
-          jsonResponse(
-            { error: "invalid_grant", error_description: "grant is invalid" },
-            { status: 400 },
-          ),
-      }),
+      store: expired(),
+      capture: async () => {
+        captures += 1;
+        return { ok: false, reason: "timeout", message: "no redirect" };
+      },
     });
-    const res = await harness.call("edf_get_contracts");
-    expect(res).toMatchObject({ isToolError: true, signedIn: false });
-    expect(res.remedy).toContain("edf_auth_login");
+    const first = await harness.call("edf_get_contracts");
+    expect(first).toMatchObject({ isToolError: true, signedIn: false });
+    expect(first.remedy).toContain("edf_auth_login");
+    expect(first.error).toContain("Safari did not complete the EDF login");
     const status = await harness.call("edf_auth_status");
-    // A token file alone is not a login: status asks EDF, and reports the rejection.
-    expect(status.signedIn).toBe(false);
-    expect(status.reason).toContain("expired or was revoked");
+    expect(status).toMatchObject({ signedIn: false, renewal: "stopped" });
+    // One stray background tab, not one per call.
+    expect(captures).toBe(1);
   });
 
-  it("retries a 401 once after refreshing", async () => {
+  it("does nothing behind the user's back with EDF_SILENT_RELOGIN=0, or after a logout", async () => {
+    const capture = vi.fn(landingWith("CODE-3"));
+    const off = await connect({
+      realAuth: true,
+      env: { EDF_SILENT_RELOGIN: "0" },
+      store: expired(),
+      capture,
+    });
+    const res = await off.call("edf_get_contracts");
+    expect(res).toMatchObject({ signedIn: false });
+    expect(res.error).toContain("EDF_SILENT_RELOGIN");
+
+    const signedOut = await connect({ realAuth: true, capture });
+    expect(await signedOut.call("edf_get_contracts")).toMatchObject({ signedIn: false });
+    expect(capture).not.toHaveBeenCalled();
+  });
+
+  it("renews and retries once on a 401", async () => {
     let sitesCalls = 0;
-    const store = createMemoryTokenStore(signedInTokens());
     const harness = await connect({
       realAuth: true,
-      store,
+      store: createMemoryTokenStore(signedInTokens()),
+      capture: landingWith("CODE-4"),
       fetch: router({
         "/v1/client/sites": () => {
           sitesCalls += 1;
@@ -205,12 +230,14 @@ describe("the token provider", () => {
             : jsonResponse(fixture("sites"));
         },
         "/v2/sites/-/elec-pmax": [],
-        [TOKEN_URL]: () => jsonResponse({ access_token: "NEW", expires_in: 1199 }),
+        [TOKEN_URL]: exchange("NEW"),
       }),
     });
     const res = await harness.call("edf_get_electricity_max_power", {});
     expect(res.isToolError).toBe(false);
-    expect(sitesCalls).toBe(2);
+    // The 401, its retry, then one more: a renewal re-resolves the site, since
+    // Safari may be signed in to another EDF account by now.
+    expect(sitesCalls).toBe(3);
   });
 });
 
@@ -251,6 +278,18 @@ describe("the Safari capture script", () => {
     );
     // Private Browsing tabs read back as "", and have no EDF cookies.
     expect(script).toContain('cu is not missing value and cu is not ""');
+  });
+
+  it("leaves out every way to bring Safari forward when silent", () => {
+    expect(script).toContain("activate");
+    const silent = buildCaptureScript({
+      authorizeUrl: "https://espace-client.edf.fr/sso/oauth2/INTERNET/authorize?state=mcpabc123",
+      redirectPrefix: "https://suiviconso.edf.fr/openid",
+      timeoutMs: 1000,
+      reveal: false,
+    });
+    expect(silent).not.toMatch(/\bactivate\b/);
+    expect(silent).not.toContain("set index of window");
   });
 
   it("reports a closed tab, and closes its tab on timeout", () => {

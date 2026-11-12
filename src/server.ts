@@ -3,15 +3,10 @@ import { McpServer } from "@modelcontextprotocol/server";
 import { safariCapture, type RedirectCapture } from "#/auth/capture";
 import { createAuthController, type AuthController } from "#/auth/controller";
 import { BUILD_INFO } from "#/build-info";
-import { oauthTokenProvider, type Logger, type TokenProvider } from "#/client/auth";
+import type { Logger, TokenProvider } from "#/client/auth";
 import { EdfClient } from "#/client/edf";
 import { createOAuthClient } from "#/client/oauth";
-import {
-  createFileTokenStore,
-  createMemoryTokenStore,
-  TOKEN_FILE_VERSION,
-  type TokenStore,
-} from "#/client/tokens";
+import { createFileTokenStore, type TokenStore } from "#/client/tokens";
 import { API_BASE_URL, type Config } from "#/config";
 import { registerTools } from "#/tools/index";
 
@@ -38,50 +33,42 @@ export type CreatedServer = {
   auth: AuthController;
 };
 
-/** EDF_REFRESH_TOKEN wins over the file, and keeps nothing on disk. */
-const createStore = (config: Config, logger: Logger | undefined): TokenStore =>
-  config.refreshToken
-    ? createMemoryTokenStore({
-        version: TOKEN_FILE_VERSION,
-        refreshToken: config.refreshToken,
-        expiresAt: 0,
-        obtainedAt: 0,
-      })
-    : createFileTokenStore(config.tokenFile, logger);
-
 export const createServer = (opts: CreateServerOptions): CreatedServer => {
   const { config } = opts;
   const now = opts.now ?? Date.now;
   const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION });
 
-  const store = opts.store ?? createStore(config, opts.logger);
+  const store = opts.store ?? createFileTokenStore(config.tokenFile, opts.logger);
   const oauth = createOAuthClient({
     timeoutMs: config.timeoutMs,
     ...(opts.fetch ? { fetch: opts.fetch } : {}),
     logger: opts.logger,
   });
-  const tokenProvider =
-    opts.tokenProvider ?? oauthTokenProvider({ store, oauth, logger: opts.logger, now });
 
-  const client = new EdfClient({
+  // The controller owns the token provider (it renews through a silent login),
+  // and the client needs the provider, so the client comes second. The
+  // controller only reaches the client from a callback, after both exist.
+  let client: EdfClient | undefined;
+  const auth = createAuthController({
+    store,
+    oauth,
+    tokenProvider: opts.tokenProvider,
+    capture: opts.capture ?? safariCapture,
+    silentRenewal: config.silentRelogin,
+    onIdentityChange: () => client?.resetSite(),
+    logger: opts.logger,
+    now,
+  });
+
+  client = new EdfClient({
     baseUrl: API_BASE_URL,
-    tokenProvider,
+    tokenProvider: auth.tokenProvider,
     maxRetries: config.maxRetries,
     timeoutMs: config.timeoutMs,
     userAgent: USER_AGENT,
     expectedSite: config.site,
     ...(opts.fetch ? { fetch: opts.fetch } : {}),
     logger: opts.logger,
-  });
-
-  const auth = createAuthController({
-    store,
-    oauth,
-    tokenProvider,
-    capture: opts.capture ?? safariCapture,
-    onIdentityChange: () => client.resetSite(),
-    logger: opts.logger,
-    now,
   });
 
   registerTools(server, client, { config, auth, now });

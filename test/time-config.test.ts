@@ -60,8 +60,20 @@ const writeConfig = (body: unknown): string => {
 describe("config", () => {
   it("needs nothing at all", () => {
     const config = loadConfig({}, ABSENT_CONFIG);
-    expect(config.refreshToken).toBeUndefined();
+    expect(config.silentRelogin).toBe(true);
     expect(config.tokenFile).toMatch(/edf\/tokens\.json$/);
+  });
+
+  it("reads EDF_SILENT_RELOGIN as a boolean, and lets it beat the file", () => {
+    const path = writeConfig({ silentRelogin: true });
+    expect(loadConfig({ EDF_SILENT_RELOGIN: "0" }, path).silentRelogin).toBe(false);
+    expect(loadConfig({ EDF_SILENT_RELOGIN: "off" }, ABSENT_CONFIG).silentRelogin).toBe(false);
+    expect(loadConfig({ EDF_SILENT_RELOGIN: "" }, path).silentRelogin).toBe(true);
+  });
+
+  it("rejects the refreshToken setting of 0.2, which can never work", () => {
+    const path = writeConfig({ refreshToken: "x" });
+    expect(() => loadConfig({}, path)).toThrow(/refreshToken/);
   });
 
   it("merges per field, environment first", () => {

@@ -155,7 +155,7 @@ export class EdfClient {
       });
 
       if (res.status === 401 && this.tokens.refreshable && attempt < this.maxRetries) {
-        this.logger?.warn?.("HTTP 401, refreshing the EDF token and retrying");
+        this.logger?.warn?.("HTTP 401, renewing the EDF login and retrying");
         this.tokens.invalidate();
         attempt += 1;
         continue;

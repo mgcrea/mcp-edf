@@ -17,8 +17,8 @@ It reads; it never writes. There are no mutating tools to enable.
 | Tool                              | What it does                                                                    |
 | --------------------------------- | ------------------------------------------------------------------------------- |
 | `edf_auth_status`                 | Signed in or not, which home it reads, where the login is stored                |
-| `edf_auth_login`                  | Logs in through a Safari tab (macOS) and keeps a refresh token                  |
-| `edf_auth_logout`                 | Revokes the refresh token at EDF and deletes it locally                         |
+| `edf_auth_login`                  | Logs in through a Safari tab (macOS); later renewals happen on their own        |
+| `edf_auth_logout`                 | Revokes the login at EDF, deletes it locally, and stops silent renewal          |
 | `edf_get_contracts`               | Electricity option (BASE / HPHC / TEMPO…), subscribed kVA, gas tariff, history  |
 | `edf_get_electricity_consumption` | kWh and € per day or month, split by tariff heading, with totals                |
 | `edf_get_electricity_load_curve`  | `[start, kWh, avg kW]` per 30 minutes or hour, with the peak                    |
@@ -55,15 +55,18 @@ There is nothing to configure. Ask your agent to call `edf_auth_login`:
 that address uses up the code as soon as it loads. The server polls the tab's address every
 20 ms and closes the tab the moment the code arrives, before the page can use it.
 
-The login is kept as a refresh token in `~/.config/edf/tokens.json` (mode 600). EDF's access
-tokens last 20 minutes and are renewed from it. EDF does not rotate the refresh token, and does
-not publish how long it lasts.
-
-> **How long a login lasts is not known yet, and may be short.** The first login measured died
-> in under 35 minutes, around the time Safari's own EDF session ended, with a Suivi Conso tab
-> open in Safari. It is unclear yet whether the refresh token is tied to EDF's web session, or
-> whether a Suivi Conso tab logging out revokes it. When it dies, the tools answer
-> `signedIn: false` and you log in again.
+**How long a login lasts.** An EDF login is a 20-minute access token, kept in
+`~/.config/edf/tokens.json` (mode 600). EDF does issue a refresh token with it, but that token is
+valid for about one second (measured: a refresh 0.8 s after login works, one at 1.5 s is refused),
+so it cannot keep a login alive. What lasts is EDF's web session in Safari. When the 20 minutes
+are up, the next tool call renews the login silently through Safari: a background tab opens and
+closes itself within a second, without bringing Safari forward (0.8 to 0.9 s measured). That
+keeps working for as long as Safari stays signed in to EDF, and EDF ends that session after about
+20 minutes without use (there is no "stay signed in" option). So a login carries through a working
+session, but not through a longer break. Once Safari's EDF session has expired, the silent renewal
+fails once, stops trying, and the tools answer `signedIn: false`: call `edf_auth_login` again, and
+log in in the tab it opens.
+`EDF_SILENT_RELOGIN=0` turns silent renewal off. Each login then lasts exactly 20 minutes.
 
 The login tab opens in a regular Safari window, never a Private Browsing one: Safari hides
 private tabs' addresses from automation, and a private window has none of your EDF cookies.
@@ -71,20 +74,19 @@ private tabs' addresses from automation, and a private window has none of your E
 **Without macOS.** `edf_auth_login` also takes a `redirect_url`: the address the browser lands
 on after logging in, `https://suiviconso.edf.fr/openid?code=…`. The Suivi Conso page strips the
 code within a second, so you have to copy the address before the page runs, for example with
-JavaScript disabled for that site. A refresh token obtained elsewhere can be supplied as
-`EDF_REFRESH_TOKEN` (in Docker, for instance).
+JavaScript disabled for that site. Such a login lasts 20 minutes: silent renewal needs Safari.
 
 ## Configure (all optional)
 
-| Variable            | Description                                                                                                                    |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `EDF_SITE`          | The home to read, as part of its address (e.g. `LYON`). Required only if the account has several; any read refuses a mismatch. |
-| `EDF_REFRESH_TOKEN` | A refresh token from outside. Kept in memory only, so a login made in-session lasts until restart.                             |
-| `EDF_TOKEN_FILE`    | Where the login is stored. Defaults to `~/.config/edf/tokens.json`.                                                            |
-| `EDF_CONFIG`        | A JSON config file with the same settings (`site`, `tokenFile`, …). Defaults to `~/.config/edf/config.json`.                   |
-| `EDF_MAX_RETRIES`   | Retries for 401 / 429 / 5xx. Default 3.                                                                                        |
-| `EDF_TIMEOUT_MS`    | Per-request timeout. Default 30000.                                                                                            |
-| `EDF_DEBUG`         | `1` logs each request to stderr.                                                                                               |
+| Variable             | Description                                                                                                                    |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `EDF_SITE`           | The home to read, as part of its address (e.g. `LYON`). Required only if the account has several; any read refuses a mismatch. |
+| `EDF_SILENT_RELOGIN` | `0` to never renew a lapsed login through Safari behind a tool call. Default on.                                               |
+| `EDF_TOKEN_FILE`     | Where the login is stored. Defaults to `~/.config/edf/tokens.json`.                                                            |
+| `EDF_CONFIG`         | A JSON config file with the same settings (`site`, `tokenFile`, …). Defaults to `~/.config/edf/config.json`.                   |
+| `EDF_MAX_RETRIES`    | Retries for 401 / 429 / 5xx. Default 3.                                                                                        |
+| `EDF_TIMEOUT_MS`     | Per-request timeout. Default 30000.                                                                                            |
+| `EDF_DEBUG`          | `1` logs each request to stderr.                                                                                               |
 
 The environment wins over the config file, field by field.
 

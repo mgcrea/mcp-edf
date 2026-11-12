@@ -1,5 +1,4 @@
 import { SignInRequiredError } from "#/client/errors";
-import { OAuthError, toStoredTokens, type OAuthClient } from "#/client/oauth";
 import type { StoredTokens, TokenStore } from "#/client/tokens";
 
 export type Logger = {
@@ -12,17 +11,17 @@ export type AuthStatus =
   | { signedIn: false; reason: string }
   | {
       signedIn: true;
-      /** When the user last logged in (the refresh token's issue time). */
+      /** When the current access token was obtained (a login or a silent renewal). */
       obtainedAt: number;
-      /** When the cached access token runs out; 0 when none is cached. */
+      /** When the access token runs out; 0 once invalidated after a 401. */
       accessExpiresAt: number;
-      /** The last refresh failure, if the stored login is in doubt. */
+      /** The last renewal failure, if the stored login is in doubt. */
       lastError?: string;
     };
 
 export type TokenProvider = {
   getToken(): Promise<string>;
-  /** Called by the client's retry loop on a 401, so an expired token is reminted once. */
+  /** Called by the client's retry loop on a 401, so a rejected token is renewed once. */
   invalidate(): void;
   /**
    * Whether invalidate() can produce a different token. A static token cannot,
@@ -41,47 +40,56 @@ export const staticTokenProvider = (token: string): TokenProvider => ({
 });
 
 /**
- * EDF's access token lives 1199 s and is refreshed on demand. One in-flight
- * promise coordinates concurrent callers, so a burst of tool calls at expiry
- * refreshes once rather than once per call.
+ * Gets a fresh login when the stored one has run out; throws SignInRequiredError
+ * when it cannot. The auth controller supplies it (a silent Safari login).
  */
-export const oauthTokenProvider = (opts: {
+export type Renewer = () => Promise<StoredTokens>;
+
+/**
+ * EDF's access token lives 1199 s and cannot be refreshed: the refresh token
+ * EDF issues with it is dead within a second (see StoredTokens). So the token
+ * is used until it is a minute from expiry, then `renew` replaces it. One
+ * in-flight promise coordinates concurrent callers, so a burst of tool calls at
+ * expiry renews once rather than once per call.
+ */
+export const sessionTokenProvider = (opts: {
   store: TokenStore;
-  oauth: OAuthClient;
+  /** Undefined when silent renewal is off: an expired login then means "log in again". */
+  renew?: Renewer | undefined;
   logger?: Logger | undefined;
   now?: () => number;
 }): TokenProvider => {
   const now = opts.now ?? Date.now;
-  /** Refresh a minute early, so a token cannot expire mid-flight. */
+  /** Renew a minute early, so a token cannot expire mid-flight. */
   const SKEW_MS = 60_000;
   let inFlight: Promise<string> | undefined;
   let lastError: string | undefined;
 
-  const refresh = async (tokens: StoredTokens): Promise<string> => {
+  const renew = async (renewer: Renewer): Promise<string> => {
     try {
-      const res = await opts.oauth.refresh(tokens.refreshToken);
-      const next = toStoredTokens(res, { now: now(), previous: tokens });
-      opts.store.write(next);
+      const next = await renewer();
       lastError = undefined;
-      return res.access_token;
+      return next.accessToken;
     } catch (err) {
-      if (err instanceof OAuthError && (err.code === "invalid_grant" || err.status === 401)) {
-        lastError = "EDF rejected the stored login (it expired or was revoked).";
-        throw new SignInRequiredError(`${lastError} Log in again.`, { cause: err });
-      }
       lastError = err instanceof Error ? err.message : String(err);
       throw err;
     }
   };
 
   return {
-    refreshable: true,
+    refreshable: opts.renew !== undefined,
 
     async getToken() {
       const tokens = opts.store.read();
       if (!tokens) throw new SignInRequiredError("Not signed in to EDF.");
-      if (tokens.accessToken && tokens.expiresAt - SKEW_MS > now()) return tokens.accessToken;
-      inFlight ??= refresh(tokens).finally(() => {
+      if (tokens.expiresAt - SKEW_MS > now()) return tokens.accessToken;
+      if (!opts.renew) {
+        throw new SignInRequiredError(
+          "The EDF login ran out: EDF logins last 20 minutes, and silent renewal is off (EDF_SILENT_RELOGIN).",
+        );
+      }
+      const renewer = opts.renew;
+      inFlight ??= renew(renewer).finally(() => {
         inFlight = undefined;
       });
       return inFlight;
@@ -89,10 +97,7 @@ export const oauthTokenProvider = (opts: {
 
     invalidate() {
       const tokens = opts.store.read();
-      if (tokens?.accessToken) {
-        const { accessToken: _dropped, ...rest } = tokens;
-        opts.store.write({ ...rest, expiresAt: 0 });
-      }
+      if (tokens && tokens.expiresAt !== 0) opts.store.write({ ...tokens, expiresAt: 0 });
     },
 
     describe() {
@@ -101,7 +106,7 @@ export const oauthTokenProvider = (opts: {
       return {
         signedIn: true,
         obtainedAt: tokens.obtainedAt,
-        accessExpiresAt: tokens.accessToken ? tokens.expiresAt : 0,
+        accessExpiresAt: tokens.expiresAt,
         ...(lastError ? { lastError } : {}),
       };
     },

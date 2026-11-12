@@ -60,7 +60,6 @@ export const baseRoutes = (): Record<string, Route> => ({
 
 export const signedInTokens = (overrides: Partial<StoredTokens> = {}): StoredTokens => ({
   version: TOKEN_FILE_VERSION,
-  refreshToken: "refresh-1",
   accessToken: "access-1",
   expiresAt: NOW + 15 * 60_000,
   obtainedAt: NOW - 3_600_000,

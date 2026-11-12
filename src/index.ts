@@ -4,8 +4,9 @@ export { loadConfig, setupInstructions, type Config } from "#/config";
 export { EdfClient, pickSite, type EdfClientOptions, type Query, type Site } from "#/client/edf";
 export { EdfApiError, PreconditionError, SignInRequiredError } from "#/client/errors";
 export {
-  oauthTokenProvider,
+  sessionTokenProvider,
   staticTokenProvider,
+  type Renewer,
   type Logger,
   type TokenProvider,
 } from "#/client/auth";

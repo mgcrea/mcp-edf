@@ -9,20 +9,23 @@ import { warnIfGroupReadable } from "#/config";
  * treated as absent rather than guessed at: logging in again costs a few
  * seconds, while misreading a token file fails in confusing ways.
  */
-export const TOKEN_FILE_VERSION = 1;
+export const TOKEN_FILE_VERSION = 2;
 
+/**
+ * Version 2 keeps the access token only. EDF does issue a refresh token to this
+ * client, but it is valid for about one second (measured 2026-11-12: a refresh
+ * at +0.8 s works, one at +1.5 s answers invalid_grant, used or not), so there
+ * is nothing worth storing. What lasts is EDF's SSO session in Safari, and the
+ * auth controller renews through it. A version 1 file (with a refresh token) is
+ * read as absent.
+ */
 export type StoredTokens = {
   version: number;
-  /**
-   * EDF's SSO does not rotate refresh tokens: a refresh answers with a new
-   * access token only (checked 2026-11-11), so this one stays valid until EDF
-   * expires or revokes it. Its lifetime is not published.
-   */
-  refreshToken: string;
-  accessToken?: string;
-  /** Milliseconds since epoch. 0 means "refresh before use". */
+  /** EDF's access token: opaque, valid 1199 s. */
+  accessToken: string;
+  /** Milliseconds since epoch. 0 means "renew before use". */
   expiresAt: number;
-  /** When the refresh token was obtained, i.e. when the user last logged in. */
+  /** When this access token was obtained, by a login or a silent renewal. */
   obtainedAt: number;
 };
 
@@ -30,7 +33,7 @@ export type TokenStore = {
   read(): StoredTokens | undefined;
   write(tokens: StoredTokens): void;
   clear(): void;
-  /** Undefined for an in-memory store (EDF_REFRESH_TOKEN). */
+  /** Undefined for an in-memory store (tests). */
   path: string | undefined;
 };
 
@@ -76,7 +79,7 @@ export const createFileTokenStore = (path: string, logger?: Logger): TokenStore 
       typeof parsed !== "object" ||
       parsed === null ||
       (parsed as StoredTokens).version !== TOKEN_FILE_VERSION ||
-      typeof (parsed as StoredTokens).refreshToken !== "string"
+      typeof (parsed as StoredTokens).accessToken !== "string"
     ) {
       return undefined;
     }
@@ -118,7 +121,7 @@ export const createFileTokenStore = (path: string, logger?: Logger): TokenStore 
   };
 };
 
-/** For EDF_REFRESH_TOKEN: nothing touches disk, so a read-only filesystem works. */
+/** Nothing touches disk: for tests, and for embedding without a token file. */
 export const createMemoryTokenStore = (seed: StoredTokens | undefined): TokenStore => {
   let current = seed;
   return {

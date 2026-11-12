@@ -1,6 +1,6 @@
 {
   "name": "@mgcrea/mcp-edf",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Model Context Protocol server for EDF Suivi Conso: daily electricity and gas consumption, costs and contracts",
   "keywords": [
     "edf",

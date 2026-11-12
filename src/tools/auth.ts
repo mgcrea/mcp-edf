@@ -21,18 +21,19 @@ export const registerAuthTools = (server: McpServer, client: EdfClient, ctx: Too
       title: "EDF: Auth Status",
       description:
         "Whether the server is signed in to EDF, which home it reads (the login picks the account, " +
-        "and an account can hold several homes), when the login was made, and where it is stored. " +
-        "Signed out, returns the steps to sign in. Call this first when a data tool answers " +
-        "signedIn: false.",
+        "and an account can hold several homes), when the 20-minute login runs out and how it is " +
+        "renewed, and where it is stored. Signed out, returns the steps to sign in. Call this first " +
+        "when a data tool answers signedIn: false. Like any tool call, it may renew a lapsed login " +
+        "silently through Safari (a background tab that closes itself).",
       inputSchema: z.object({}),
       annotations: { readOnlyHint: true, openWorldHint: true },
     },
     async () =>
       wrap(async () => {
-        // A stored token file is not proof of a login: EDF can have rejected the
-        // refresh token since. Asking for a token refreshes it when the access
-        // token has run out, so a dead login shows here as signedIn: false
-        // instead of surfacing on the next data call (seen 2026-11-12).
+        // A stored token file is not proof of a login: the access token lasts 20
+        // minutes. Asking for a token renews it when it has run out, so a login
+        // that cannot be renewed shows here as signedIn: false instead of
+        // surfacing on the next data call (seen 2026-11-12).
         let verifyError: string | undefined;
         if (ctx.auth.tokenProvider.describe().signedIn) {
           try {
@@ -49,6 +50,13 @@ export const registerAuthTools = (server: McpServer, client: EdfClient, ctx: Too
         const mode = tokenFile ? fileMode(tokenFile) : undefined;
         const pendingUrl = ctx.auth.pendingUrl();
         const lastError = ctx.auth.lastError();
+        const renewal = ctx.auth.renewal();
+        const renewalNote =
+          renewal.mode === "silent"
+            ? "EDF logins last 20 minutes. When this one runs out, the next tool call renews it silently through Safari, as long as Safari is still signed in to EDF."
+            : renewal.mode === "off"
+              ? "EDF logins last 20 minutes, and silent renewal is off (EDF_SILENT_RELOGIN): call edf_auth_login when it runs out."
+              : `EDF logins last 20 minutes. Silent renewal is paused until the next login: ${renewal.reason}`;
         let site: Record<string, unknown> | undefined;
         if (status.signedIn) {
           try {
@@ -70,13 +78,12 @@ export const registerAuthTools = (server: McpServer, client: EdfClient, ctx: Too
             ? {
                 site,
                 signed_in_at: status.obtainedAt ? iso(status.obtainedAt) : undefined,
-                ...(status.accessExpiresAt
-                  ? { access_token_expires_at: iso(status.accessExpiresAt) }
-                  : {}),
-                ...(status.lastError ? { last_refresh_error: status.lastError } : {}),
-                note: "The access token lasts 20 minutes and is renewed from the stored refresh token on demand.",
+                ...(status.accessExpiresAt ? { expires_at: iso(status.accessExpiresAt) } : {}),
+                renewal: renewal.mode,
+                ...(status.lastError ? { last_renewal_error: status.lastError } : {}),
+                note: renewalNote,
               }
-            : { reason: status.reason, setup: setupInstructions() }),
+            : { reason: status.reason, renewal: renewal.mode, setup: setupInstructions() }),
           ...(ctx.config.site ? { expected_site: ctx.config.site } : {}),
           token_source: tokenFile
             ? {
@@ -86,7 +93,7 @@ export const registerAuthTools = (server: McpServer, client: EdfClient, ctx: Too
                   ? { warning: `Readable by other users. Run: chmod 600 ${tokenFile}` }
                   : {}),
               }
-            : "EDF_REFRESH_TOKEN (environment; a login made here lasts until restart)",
+            : "memory (nothing on disk)",
           ...(pendingUrl
             ? {
                 pending_login: {
@@ -111,7 +118,9 @@ export const registerAuthTools = (server: McpServer, client: EdfClient, ctx: Too
         "usual. The first run triggers macOS's 'allow to control Safari' prompt. Waits up to " +
         "wait_seconds, then keeps listening in the background for 5 minutes: call edf_auth_status " +
         "afterwards. Elsewhere, pass redirect_url instead (see that argument). Logging in again " +
-        "replaces the stored login.",
+        "replaces the stored login. An EDF login lasts 20 minutes; after that the server renews it " +
+        "silently through Safari while Safari stays signed in to EDF, so calling this again is " +
+        "only needed when a tool answers signedIn: false.",
       inputSchema: z.object({
         wait_seconds: z
           .number()
@@ -196,8 +205,9 @@ export const registerAuthTools = (server: McpServer, client: EdfClient, ctx: Too
     {
       title: "EDF: Logout",
       description:
-        "Revoke the stored refresh token at EDF (best effort) and delete it locally. Recoverable by " +
-        "calling edf_auth_login again.",
+        "Revoke the stored access token at EDF (best effort) and delete it locally, which also ends " +
+        "silent renewal: no Safari tab opens until the next edf_auth_login. It does not sign Safari " +
+        "out of EDF. Recoverable by calling edf_auth_login again.",
       // No `confirm`: a supervisor's Sign out calls this with no arguments, and
       // the action is recoverable in the time it takes to log in again.
       inputSchema: z.object({}),

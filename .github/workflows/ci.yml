@@ -97,11 +97,11 @@ jobs:
           [ "$actual" = "$expected" ] \
             || { echo "tool set changed:"; echo "  expected: $expected"; echo "  actual:   $actual"; exit 1; }
 
-          # 3. A refresh token in the environment must not change the set.
-          list_tools EDF_REFRESH_TOKEN=ci-fake > /tmp/token.json
+          # 3. Turning silent renewal off must not change the set.
+          list_tools EDF_SILENT_RELOGIN=0 > /tmp/token.json
           with_token=$(grep -o '"name":"edf_[a-z0-9_]*"' /tmp/token.json | cut -d'"' -f4 | sort -u | tr '\n' ' ' | sed 's/ $//')
           [ "$with_token" = "$expected" ] \
-            || { echo "EDF_REFRESH_TOKEN changed the tool set: $with_token"; exit 1; }
+            || { echo "EDF_SILENT_RELOGIN changed the tool set: $with_token"; exit 1; }
           echo "smoke test ok: $(echo $expected | wc -w) tools"
 
   publish-npm:

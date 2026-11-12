@@ -5,7 +5,12 @@ import type { StoredTokens } from "#/client/tokens";
 import { TOKEN_FILE_VERSION } from "#/client/tokens";
 import { SSO_BASE_URL, SSO_CLIENT_ID, SSO_REDIRECT_URI, SSO_SCOPE } from "#/config";
 
-/** EDF's token endpoint answer (ForgeRock AM). No id_token: the scope has no `openid`. */
+/**
+ * EDF's token endpoint answer (ForgeRock AM). No id_token: the scope has no
+ * `openid`. It carries a refresh_token too, which is ignored: EDF honours it
+ * for about one second (see StoredTokens), so a refresh grant is never worth
+ * attempting.
+ */
 export type TokenResponse = {
   access_token: string;
   refresh_token?: string;
@@ -30,7 +35,6 @@ export class OAuthError extends Error {
 export type OAuthClient = {
   authorizeUrl(state: string): string;
   exchangeCode(code: string): Promise<TokenResponse>;
-  refresh(refreshToken: string): Promise<TokenResponse>;
   /** Best effort: true only when EDF confirmed the revocation. */
   revoke(token: string): Promise<boolean>;
 };
@@ -108,13 +112,6 @@ export const createOAuthClient = (
         redirect_uri: SSO_REDIRECT_URI,
       }),
 
-    refresh: (refreshToken) =>
-      tokenRequest({
-        grant_type: "refresh_token",
-        refresh_token: refreshToken,
-        client_id: SSO_CLIENT_ID,
-      }),
-
     async revoke(token) {
       try {
         const res = await post("/token/revoke", { token, client_id: SSO_CLIENT_ID });
@@ -127,28 +124,15 @@ export const createOAuthClient = (
   };
 };
 
-/**
- * Turn a token response into what the store keeps. A refresh answers without a
- * refresh_token, so the previous one is carried over rather than lost.
- */
-export const toStoredTokens = (
-  res: TokenResponse,
-  opts: { now: number; previous?: StoredTokens },
-): StoredTokens => {
-  const refreshToken = res.refresh_token ?? opts.previous?.refreshToken;
-  if (!refreshToken) {
-    throw new OAuthError("EDF issued no refresh token, so the login could not be kept.", {
-      status: 200,
-    });
-  }
+/** Turn a token response into what the store keeps. */
+export const toStoredTokens = (res: TokenResponse, opts: { now: number }): StoredTokens => {
   // EDF says 1199 s. Without a figure, assume the short end rather than reuse
   // a token the server has already dropped.
   const lifetimeMs = (res.expires_in ?? 600) * 1000;
   return {
     version: TOKEN_FILE_VERSION,
-    refreshToken,
     accessToken: res.access_token,
     expiresAt: opts.now + lifetimeMs,
-    obtainedAt: res.refresh_token ? opts.now : (opts.previous?.obtainedAt ?? opts.now),
+    obtainedAt: opts.now,
   };
 };

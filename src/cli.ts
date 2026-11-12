@@ -40,7 +40,7 @@ const main = async (): Promise<void> => {
   const status = auth.tokenProvider.describe();
   stderrLogger.warn(
     `edf-mcp connected (signedIn=${status.signedIn}, ` +
-      `tokens=${config.refreshToken ? "EDF_REFRESH_TOKEN" : config.tokenFile}, ` +
+      `tokens=${config.tokenFile}, silentRelogin=${config.silentRelogin ? "on" : "off"}, ` +
       `site=${config.site ?? "auto"}, writes=none: read-only server)`,
   );
   if (!status.signedIn) for (const line of setupInstructions()) stderrLogger.warn(line);

@@ -18,7 +18,7 @@ export class EdfApiError extends Error {
   }
 }
 
-/** No usable login: never logged in, logged out, or EDF expired the refresh token. */
+/** No usable login: never logged in, logged out, or the 20-minute login ran out and could not be renewed. */
 export class SignInRequiredError extends Error {
   override readonly name = "SignInRequiredError";
   readonly remedy = "Call edf_auth_login, then retry.";

@@ -27,9 +27,13 @@ export const SSO_SCOPE = "b2c_business_process b2c_services";
 
 const ConfigSchema = z
   .object({
-    /** A refresh token supplied from outside (a secret store, CI) instead of the token file. */
-    refreshToken: z.string().min(1).optional(),
     tokenFile: z.string().min(1),
+    /**
+     * Renew the 20-minute EDF login through Safari's EDF session when it runs
+     * out, without asking. EDF's refresh token is dead within a second, so this
+     * is the only way a login outlives 20 minutes. Off: log in again each time.
+     */
+    silentRelogin: z.boolean().default(true),
     /**
      * Expected home, matched against the site's address (case-insensitive
      * substring) or its siteExternalId. When set, every data tool refuses to
@@ -57,8 +61,8 @@ export type Config = z.infer<typeof ConfigSchema>;
  */
 const FileSchema = z
   .object({
-    refreshToken: z.string().optional(),
     tokenFile: z.string().optional(),
+    silentRelogin: z.boolean().optional(),
     site: z.string().optional(),
     maxRetries: z.number().optional(),
     timeoutMs: z.number().optional(),
@@ -71,6 +75,14 @@ const parseIntOpt = (value: string | undefined): number | undefined => {
   if (value === undefined || value.trim() === "") return undefined;
   const n = Number(value);
   return Number.isInteger(n) ? n : undefined;
+};
+
+const parseBoolOpt = (value: string | undefined): boolean | undefined => {
+  const v = value?.trim().toLowerCase();
+  if (!v) return undefined;
+  if (["1", "true", "yes", "on"].includes(v)) return true;
+  if (["0", "false", "no", "off"].includes(v)) return false;
+  return undefined;
 };
 
 /** Maps "" to undefined, so an empty env var means "unset" rather than "empty". */
@@ -148,8 +160,8 @@ export const loadConfig = (
   const tokenFile =
     trimmed(env.EDF_TOKEN_FILE) ?? trimmed(file.tokenFile) ?? join(configDir(env), "tokens.json");
   return ConfigSchema.parse({
-    refreshToken: trimmed(env.EDF_REFRESH_TOKEN) ?? trimmed(file.refreshToken),
     tokenFile: expandTilde(tokenFile),
+    silentRelogin: parseBoolOpt(env.EDF_SILENT_RELOGIN) ?? file.silentRelogin,
     site: trimmed(env.EDF_SITE) ?? trimmed(file.site),
     maxRetries: parseIntOpt(env.EDF_MAX_RETRIES) ?? file.maxRetries,
     timeoutMs: parseIntOpt(env.EDF_TIMEOUT_MS) ?? file.timeoutMs,
@@ -163,6 +175,8 @@ export const setupInstructions = (): string[] => [
     "in to EDF, it completes on its own in a second or two.",
   "The first time, macOS asks whether this app may control Safari: allow it. Without that " +
     "grant the login cannot read the tab's address, which is where the one-time code arrives.",
-  "The login is kept as a refresh token (mode 600). How long EDF honours it is not known " +
-    "yet and may be short: when it lapses, the tools answer signedIn: false; log in again.",
+  "An EDF login lasts 20 minutes. When it runs out, the server renews it silently through " +
+    "Safari for as long as Safari stays signed in to EDF (a tab flickers in the background). " +
+    "EDF ends that session after about 20 minutes without use; after a longer break the tools " +
+    "answer signedIn: false: log in again.",
 ];
