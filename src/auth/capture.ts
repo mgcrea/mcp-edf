@@ -42,41 +42,111 @@ const REVEAL_AFTER_MS = 2_000;
 const asString = (value: string): string =>
   `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 
+/** Printed by the script when the user closed the login tab, so the wait ends at once. */
+export const TAB_CLOSED = "TAB_CLOSED";
+
+/**
+ * Two lessons from running this against Safari (2026-11-12):
+ *
+ * - The loop runs against a clock deadline, not an iteration count. Each pass is
+ *   a 20 ms delay PLUS Apple Events, so 15,000 passes meant as 5 minutes outlived
+ *   execFile's kill timer. A killed script never closes its tab, and reports a
+ *   bare "Command failed" instead of a timeout.
+ * - The tab is found by the login's `state`, not held as `tab N of window W`.
+ *   AppleScript tab references are indices, so closing any tab to the left of
+ *   ours shifted the reference onto another tab or off the end. The state is in
+ *   every address of the flow (the authorize URL, the login page's `goto`, the
+ *   final redirect), so one `URL of every tab of every window` per pass finds
+ *   it wherever it is, and a tab once seen and then gone for 5 s was closed.
+ */
 export const buildCaptureScript = (opts: {
   authorizeUrl: string;
   redirectPrefix: string;
   timeoutMs: number;
 }): string => {
-  const iterations = Math.max(1, Math.ceil(opts.timeoutMs / POLL_MS));
-  const revealAt = Math.ceil(REVEAL_AFTER_MS / POLL_MS);
+  const marker = new URL(opts.authorizeUrl).searchParams.get("state") ?? opts.authorizeUrl;
+  const seconds = Math.max(1, Math.ceil(opts.timeoutMs / 1000));
+  const revealAfter = Math.ceil(REVEAL_AFTER_MS / 1000);
   return `
 tell application "Safari"
-  if (count of windows) is 0 then make new document
-  set w to front window
-  set t to make new tab at end of tabs of w with properties {URL:${asString(opts.authorizeUrl)}}
-  set found to ""
-  set i to 0
-  repeat ${iterations} times
-    delay ${POLL_MS / 1000}
-    set i to i + 1
+  -- A regular window, never a Private Browsing one: Safari hides private tabs'
+  -- URLs from AppleScript (they read as ""), and a private window has none of
+  -- the user's EDF cookies, so the login could neither complete silently nor
+  -- be seen (2026-11-12). A window whose current tab's URL reads back is a
+  -- regular one; with none, open a new regular window. Its id is stable where
+  -- a tab index is not.
+  set wid to missing value
+  repeat with w in windows
     try
-      set u to URL of t
-      if u starts with ${asString(opts.redirectPrefix)} and u contains "code=" then
-        set found to u
+      set cu to URL of current tab of w
+      -- A private tab reads back as "" (or missing value), never as its URL.
+      if cu is not missing value and cu is not "" then
+        set wid to id of w
         exit repeat
       end if
     end try
-    if i is ${revealAt} then
-      try
-        set current tab of w to t
-        activate
-      end try
-    end if
   end repeat
+  if wid is missing value then
+    make new document
+    set wid to id of front window
+  end if
+  make new tab at end of tabs of window id wid with properties {URL:${asString(opts.authorizeUrl)}}
+  set startedAt to current date
+  set deadline to startedAt + ${seconds}
+  set revealed to false
+  set seenAt to missing value
+  repeat while (current date) < deadline
+    delay ${POLL_MS / 1000}
+    set hit to false
+    try
+      set allUrls to URL of every tab of every window
+    on error
+      set allUrls to {}
+    end try
+    set wi to 0
+    repeat with windowUrls in allUrls
+      set wi to wi + 1
+      set ti to 0
+      repeat with oneUrl in windowUrls
+        set ti to ti + 1
+        set u to contents of oneUrl
+        if u is not missing value and u contains ${asString(marker)} then
+          set hit to true
+          set seenAt to current date
+          if u starts with ${asString(opts.redirectPrefix)} and u contains "code=" then
+            try
+              close tab ti of window wi
+            end try
+            return u
+          end if
+        end if
+      end repeat
+    end repeat
+    -- No redirect within 2 s: the user has to log in, so show the tab. This must
+    -- not wait for the marker to be seen: Safari leaves a background tab in an
+    -- unfocused window unloaded, with a missing URL, until it is shown.
+    if not revealed and ((current date) - startedAt) >= ${revealAfter} then
+      set revealed to true
+      try
+        set index of window id wid to 1
+        set current tab of window id wid to last tab of window id wid
+      end try
+      activate
+    end if
+    if not hit and seenAt is not missing value and ((current date) - seenAt) > 5 then return "${TAB_CLOSED}"
+  end repeat
+  -- Out of time: close our tab if it is still open, so nothing is left behind.
   try
-    close t
+    set allUrls to URL of every tab of every window
+    repeat with wi from (count of allUrls) to 1 by -1
+      set windowUrls to item wi of allUrls
+      repeat with ti from (count of windowUrls) to 1 by -1
+        set u to item ti of windowUrls
+        if u is not missing value and u contains ${asString(marker)} then close tab ti of window wi
+      end repeat
+    end repeat
   end try
-  return found
+  return ""
 end tell`;
 };
 
@@ -109,6 +179,14 @@ export const safariCapture: RedirectCapture = ({
           resolve({ ok: false, reason: "cancelled", message: "The login was cancelled." });
           return;
         }
+        if (err && (err as { killed?: boolean }).killed) {
+          resolve({
+            ok: false,
+            reason: "timeout",
+            message: "No login completed in the Safari tab before the wait ran out.",
+          });
+          return;
+        }
         if (err) {
           // -1743: the user (or MDM) has not allowed this process to control Safari.
           if (/-1743|not authori[sz]ed/i.test(`${stderr} ${err.message}`)) {
@@ -129,6 +207,14 @@ export const safariCapture: RedirectCapture = ({
           return;
         }
         const url = stdout.trim();
+        if (url === TAB_CLOSED) {
+          resolve({
+            ok: false,
+            reason: "cancelled",
+            message: "The EDF login tab was closed before the login finished.",
+          });
+          return;
+        }
         resolve(
           url
             ? { ok: true, url }

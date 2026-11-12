@@ -56,9 +56,17 @@ that address uses up the code as soon as it loads. The server polls the tab's ad
 20 ms and closes the tab the moment the code arrives, before the page can use it.
 
 The login is kept as a refresh token in `~/.config/edf/tokens.json` (mode 600). EDF's access
-tokens last 20 minutes and are renewed from it silently. EDF does not rotate the refresh token,
-and does not publish how long it lasts. When it expires, the tools answer `signedIn: false` and
-you log in again.
+tokens last 20 minutes and are renewed from it. EDF does not rotate the refresh token, and does
+not publish how long it lasts.
+
+> **How long a login lasts is not known yet, and may be short.** The first login measured died
+> in under 35 minutes, around the time Safari's own EDF session ended, with a Suivi Conso tab
+> open in Safari. It is unclear yet whether the refresh token is tied to EDF's web session, or
+> whether a Suivi Conso tab logging out revokes it. When it dies, the tools answer
+> `signedIn: false` and you log in again.
+
+The login tab opens in a regular Safari window, never a Private Browsing one: Safari hides
+private tabs' addresses from automation, and a private window has none of your EDF cookies.
 
 **Without macOS.** `edf_auth_login` also takes a `redirect_url`: the address the browser lands
 on after logging in, `https://suiviconso.edf.fr/openid?code=…`. The Suivi Conso page strips the

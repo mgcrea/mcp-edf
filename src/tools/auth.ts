@@ -29,7 +29,22 @@ export const registerAuthTools = (server: McpServer, client: EdfClient, ctx: Too
     },
     async () =>
       wrap(async () => {
-        const status = ctx.auth.tokenProvider.describe();
+        // A stored token file is not proof of a login: EDF can have rejected the
+        // refresh token since. Asking for a token refreshes it when the access
+        // token has run out, so a dead login shows here as signedIn: false
+        // instead of surfacing on the next data call (seen 2026-11-12).
+        let verifyError: string | undefined;
+        if (ctx.auth.tokenProvider.describe().signedIn) {
+          try {
+            await ctx.auth.tokenProvider.getToken();
+          } catch (err) {
+            verifyError = err instanceof Error ? err.message : String(err);
+          }
+        }
+        const described = ctx.auth.tokenProvider.describe();
+        const status: typeof described = verifyError
+          ? { signedIn: false, reason: verifyError }
+          : described;
         const tokenFile = ctx.auth.store.path;
         const mode = tokenFile ? fileMode(tokenFile) : undefined;
         const pendingUrl = ctx.auth.pendingUrl();

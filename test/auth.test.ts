@@ -186,7 +186,9 @@ describe("the token provider", () => {
     expect(res).toMatchObject({ isToolError: true, signedIn: false });
     expect(res.remedy).toContain("edf_auth_login");
     const status = await harness.call("edf_auth_status");
-    expect(status.last_refresh_error).toContain("expired or was revoked");
+    // A token file alone is not a login: status asks EDF, and reports the rejection.
+    expect(status.signedIn).toBe(false);
+    expect(status.reason).toContain("expired or was revoked");
   });
 
   it("retries a 401 once after refreshing", async () => {
@@ -229,16 +231,43 @@ describe("edf_auth_logout", () => {
 });
 
 describe("the Safari capture script", () => {
-  it("waits for the redirect prefix with a code, and closes the tab", () => {
-    const script = buildCaptureScript({
-      authorizeUrl: "https://espace-client.edf.fr/sso/oauth2/INTERNET/authorize?state=x",
-      redirectPrefix: "https://suiviconso.edf.fr/openid",
-      timeoutMs: 1000,
-    });
+  const script = buildCaptureScript({
+    authorizeUrl: "https://espace-client.edf.fr/sso/oauth2/INTERNET/authorize?state=mcpabc123",
+    redirectPrefix: "https://suiviconso.edf.fr/openid",
+    timeoutMs: 1000,
+  });
+
+  it("waits on a clock deadline, not an iteration count", () => {
+    // Each pass is a delay plus Apple Events, so a counted loop overran its budget.
+    expect(script).toContain("set deadline to startedAt + 1");
+    expect(script).toContain("repeat while (current date) < deadline");
+  });
+
+  it("finds its tab by the login's state, in a regular window", () => {
+    // Tab references are indices and shift when another tab closes.
+    expect(script).toContain('u contains "mcpabc123"');
     expect(script).toContain(
       'u starts with "https://suiviconso.edf.fr/openid" and u contains "code="',
     );
-    expect(script).toContain("repeat 50 times");
-    expect(script).toContain("close t");
+    // Private Browsing tabs read back as "", and have no EDF cookies.
+    expect(script).toContain('cu is not missing value and cu is not ""');
+  });
+
+  it("reports a closed tab, and closes its tab on timeout", () => {
+    expect(script).toContain('return "TAB_CLOSED"');
+    expect(script).toContain("Out of time: close our tab");
+  });
+});
+
+describe("edf_auth_status with a live login", () => {
+  it("stays signed in when the stored access token is still valid, without calling EDF", async () => {
+    const harness = await connect({
+      realAuth: true,
+      store: createMemoryTokenStore(signedInTokens()),
+      fetch: router(baseRoutes()),
+    });
+    const status = await harness.call("edf_auth_status");
+    expect(status.signedIn).toBe(true);
+    expect(harness.urls().some((u) => u.toString() === TOKEN_URL)).toBe(false);
   });
 });

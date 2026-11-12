@@ -163,6 +163,6 @@ export const setupInstructions = (): string[] => [
     "in to EDF, it completes on its own in a second or two.",
   "The first time, macOS asks whether this app may control Safari: allow it. Without that " +
     "grant the login cannot read the tab's address, which is where the one-time code arrives.",
-  "The login is kept as a refresh token (mode 600) and renewed silently; you only log in " +
-    "again if EDF expires it.",
+  "The login is kept as a refresh token (mode 600). How long EDF honours it is not known " +
+    "yet and may be short: when it lapses, the tools answer signedIn: false; log in again.",
 ];
